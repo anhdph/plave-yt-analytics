@@ -58,6 +58,8 @@ STALE_RUN_AFTER_MIN = 60
 # Asia/Ho_Chi_Minh is a fixed UTC+7 with no DST, so a fixed offset is exact and needs no tz database.
 LOCAL_TZ = timezone(timedelta(hours=7), "Asia/Ho_Chi_Minh")
 RECENT_WINDOW_DAYS = 30  # recent tier: published within 30 days of snapshot_ts (SPEC section 5)
+# Full run (old tier too) when no successful full run yet, or the latest one is >= this old (SPEC section 5).
+FULL_RUN_INTERVAL_HOURS = 12
 
 # --- Validation (SPEC section 8) -------------------------------------------------
 VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
