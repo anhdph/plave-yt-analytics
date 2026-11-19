@@ -86,16 +86,21 @@ Timezone of reference: **Asia/Ho_Chi_Minh (UTC+7)**. GitHub cron runs in UTC.
 
 ## 7. Video classification (Transform step, after API calls)
 Each video belongs to exactly ONE category, evaluated in this fixed priority order (rules validated against real channel data):
-1. **Music Video**: title contains `m/v` (case-insensitive) AND duration > 180s
+1. **Music Video**: title contains `m/v` (case-insensitive) AND duration > 180s AND title has no `EXCLUDE_KEYWORDS`
    (Premieres also have actualStartTime, so MV must be checked before Live)
 2. **Live**: has actualStartTime
 3. **Shorts**: title contains `#`
-4. **Performance**: title matches a keyword in `PERFORMANCE_KEYWORDS` (e.g. "performance", "stage", "live clip"), case-insensitive
+4. **Performance**: title matches a keyword in `PERFORMANCE_KEYWORDS` (e.g. "performance", "stage", "live clip"), case-insensitive,
+   AND title has no `EXCLUDE_KEYWORDS`
 5. **Other**: everything else
 
+- `EXCLUDE_KEYWORDS` ("behind", "reaction", "비하인드", "리액션", case-insensitive) marks side content about an MV or stage.
+  It only blocks MV and Performance, so e.g. `[BEHIND] 'Star Trace' M/V (Performance Ver.) 비하인드` -> Other,
+  `'Born Savage' M/V Reaction` -> Other. A Live or Shorts video stays Live / Shorts.
 - Rules, keywords and the 180s threshold live in `config.py` only.
 - Raw fields (title, duration_sec, actual_start_time) are stored alongside `category_id`, so `reclassify.py` can re-run the rules from the DB without calling the API.
-- Unit tests cover: normal case of each category, Premiere MV (M/V + actualStartTime -> MV), M/V with duration exactly 180s (-> not MV), Live title containing `#` (-> Live), NULL duration, uppercase/lowercase keywords.
+- Unit tests cover: normal case of each category, Premiere MV (M/V + actualStartTime -> MV), M/V with duration exactly 180s (-> not MV), Live title containing `#` (-> Live), NULL duration, uppercase/lowercase keywords,
+  excluded keywords (behind / reaction M/V and Performance titles -> Other; Live / Shorts unaffected).
 
 ## 8. Validation
 - IDs: video `^[A-Za-z0-9_-]{11}$`, channel `^UC[A-Za-z0-9_-]{22}$`. Invalid -> skip row, count in `rows_failed`, log WARNING.
