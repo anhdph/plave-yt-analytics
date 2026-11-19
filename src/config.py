@@ -47,6 +47,13 @@ DB_MAX_ATTEMPTS = 4
 DB_RETRY_INITIAL_WAIT_SEC = 2
 DB_RETRY_MAX_WAIT_SEC = 30
 
+# --- Run log (SPEC sections 9, 10, 12) ---------------------------------------------
+RUN_STATUSES = ("running", "success", "partial", "failed")
+RUN_TYPES = ("hourly", "full")
+ERROR_MESSAGE_MAX_LEN = 4000
+# A 'running' row older than this was killed (GitHub job timeout is 15 min): close it as failed.
+STALE_RUN_AFTER_MIN = 60
+
 # --- Time (SPEC section 6) -------------------------------------------------------
 # Asia/Ho_Chi_Minh is a fixed UTC+7 with no DST, so a fixed offset is exact and needs no tz database.
 LOCAL_TZ = timezone(timedelta(hours=7), "Asia/Ho_Chi_Minh")

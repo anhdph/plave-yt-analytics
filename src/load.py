@@ -121,7 +121,7 @@ class Database:
         self._tables: dict[str, Table] | None = None
 
     @db_retry
-    def _run(self, fn: Callable[[Connection], T]) -> T:
+    def run(self, fn: Callable[[Connection], T]) -> T:
         """Run fn in one transaction, retried on connection errors (safe: every write is an upsert)."""
         with self.engine.begin() as conn:
             return fn(conn)
@@ -145,7 +145,7 @@ class Database:
         def fn(conn: Connection) -> dict[str, datetime]:
             rows = conn.execute(text("SELECT video_id, published_at FROM plave.dim_video"))
             return {r.video_id: r.published_at for r in rows}
-        return self._run(fn)
+        return self.run(fn)
 
     def get_previous_views(self, video_ids: list[str], before: datetime) -> dict[str, int]:
         """Latest view_count strictly before `before` (the current snapshot_ts), per video.
@@ -167,7 +167,7 @@ class Database:
                 {"ids": list(video_ids), "before": before},
             )
             return {r.video_id: r.view_count for r in rows}
-        return self._run(fn)
+        return self.run(fn)
 
     def count_rows(self, snapshot_ts: datetime | None = None) -> dict[str, int]:
         """Row counts per table (and facts of one snapshot), for idempotency checks."""
@@ -182,7 +182,7 @@ class Database:
                         text(f"SELECT count(*) FROM plave.{t} WHERE snapshot_ts = :ts"), {"ts": snapshot_ts}
                     ).scalar_one()
             return counts
-        return self._run(fn)
+        return self.run(fn)
 
     # --- Writes -----------------------------------------------------------------------
 
@@ -207,7 +207,7 @@ class Database:
             stats.fact_video = _upsert(conn, t["fact_video"], [{**f, "run_id": run_id} for f in videos.facts],
                                        ["video_id", "snapshot_ts"], FACT_VIDEO_UPDATE)
             return stats
-        return self._run(fn)
+        return self.run(fn)
 
 
 # --- Local idempotency test -----------------------------------------------------------

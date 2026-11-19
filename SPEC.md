@@ -274,6 +274,10 @@ CREATE TABLE fact_channel (
 6. `logger.py` + `run_log`
 7. `main.py`: assemble the pipeline + tier logic (recent / full every 12h)
 8. GitHub Actions: `pipeline.yml` + secrets, test with `workflow_dispatch`, then enable cron; add `keepalive.yml`
+   - Right before enabling cron, wipe all test data in DBeaver (as `postgres`) so the first real run is a full backfill:
+     `TRUNCATE plave.fact_video, plave.fact_channel, plave.run_log, plave.dim_video, plave.dim_channel RESTART IDENTITY;`
+     Keep `dim_date` and `dim_category` (seed). `run_log` must be truncated too, otherwise test full runs make the first real run `hourly`.
+     Verify the first real run: `run_type = 'full'`, `fact_video` rows = videos in playlist, no fact row with `run_id IS NULL`.
 9. Let the pipeline run for at least a few days to collect real data
 10. Power BI dashboard
 11. README: architecture, data limitations, how to run, dashboard screenshots
