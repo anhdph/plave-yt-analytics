@@ -1,0 +1,27 @@
+# GitHub disables scheduled workflows after 60 days without repository activity (SPEC section 11).
+# Risk chain: cron disabled -> no DB activity -> Supabase pauses the project after 7 days.
+# This pushes an empty commit once a month so the repo never goes 60 days without activity.
+# Verify after the first month: a "keepalive" commit by github-actions[bot] appears on main.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"  # 03:00 UTC on the 1st of every month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push empty commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive $(date -u +%Y-%m-%d)"
+          git push

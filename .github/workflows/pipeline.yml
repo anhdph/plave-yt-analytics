@@ -1,0 +1,39 @@
+# Hourly pipeline (SPEC section 11): extract -> transform -> load, one run_log row per run.
+# A failed run exits non-zero, so GitHub emails the repo owner.
+name: pipeline
+
+on:
+  # Enable only after the workflow_dispatch test passed AND the test data was truncated
+  # (SPEC section 13, step 8). Minute 17 avoids the busy top of the hour. Cron is UTC.
+  # schedule:
+  #   - cron: "17 * * * *"
+  workflow_dispatch:
+
+# Never two runs at once; a queued run waits instead of cancelling the running one.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python src/main.py
