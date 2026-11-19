@@ -3,7 +3,7 @@
 name: pipeline
 
 on:
-  # Minute 17 avoids the busy top of the hour. Cron is UTC.
+  # Minute 17 avoids the busy top of the hour. Cron is UTC (17 * * * * = hh:17 UTC, hh+7:17 in Vietnam).
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
