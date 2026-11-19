@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+data/.pytest_cache/
+.vscode/
+*.egg-info/
+youtube_api_test.py
+channel_videos.csv
