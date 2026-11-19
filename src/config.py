@@ -39,6 +39,14 @@ API_MAX_ATTEMPTS = 6
 API_RETRY_INITIAL_WAIT_SEC = 2  # 2s, 4s, 8s, ... plus jitter
 API_RETRY_MAX_WAIT_SEC = 60
 
+# --- Database (SPEC sections 9, 10) -------------------------------------------------
+DB_SCHEMA = "plave"
+DB_CONNECT_TIMEOUT_SEC = 15
+# Connection errors: retry up to 3 times -> 4 attempts (covers a paused database waking up).
+DB_MAX_ATTEMPTS = 4
+DB_RETRY_INITIAL_WAIT_SEC = 2
+DB_RETRY_MAX_WAIT_SEC = 30
+
 # --- Time (SPEC section 6) -------------------------------------------------------
 # Asia/Ho_Chi_Minh is a fixed UTC+7 with no DST, so a fixed offset is exact and needs no tz database.
 LOCAL_TZ = timezone(timedelta(hours=7), "Asia/Ho_Chi_Minh")
