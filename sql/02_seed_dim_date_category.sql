@@ -5,11 +5,21 @@
 SET search_path TO plave;
 
 INSERT INTO dim_category (category_id, category_name, priority) VALUES
-    (1, 'Music Video', 1),
-    (2, 'Live',        2),
-    (3, 'Shorts',      3),
-    (4, 'Performance', 4),
-    (5, 'Other',       5)
+    (1,  'Official M/V',     12),
+    (2,  'Live',              5),
+    (3,  'Shorts - General',  3),
+    (4,  'Performance',      11),
+    (5,  'Other',            15),
+    (6,  'Cover',            14),
+    (7,  'Official Audio',   13),
+    (8,  'PL:RADIO',          4),
+    (9,  'LASSGO PLAVE',      9),
+    (10, 'PL:SENT',          10),
+    (11, 'Highlight',         6),
+    (12, 'Behind',            8),
+    (13, 'Promo',             7),
+    (14, 'Shorts - Clip',     1),
+    (15, 'Shorts - Promo',    2)
 ON CONFLICT (category_id) DO NOTHING;
 
 INSERT INTO dim_date (

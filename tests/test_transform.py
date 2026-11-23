@@ -79,7 +79,7 @@ def test_valid_video_builds_dim_and_fact():
     out = transform_videos([_video()], SNAP, previous_views={})
     assert out.rows_failed == 0
     dim, fact = out.dims[0], out.facts[0]
-    assert dim["category_id"] == config.CATEGORY_MUSIC_VIDEO
+    assert dim["category_id"] == config.CATEGORY_OFFICIAL_MV
     assert dim["published_date_key"] == 20261108  # 17:00 local
     assert fact["snapshot_ts"] == SNAP.snapshot_ts
     assert fact["date_key"] == 20261120

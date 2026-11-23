@@ -57,11 +57,16 @@ class SnapshotTime:
 
 # --- Classification ----------------------------------------------------------------
 
-def classify(title: str | None, duration_sec: int | None, actual_start_time: datetime | None) -> int:
+def classify(
+    title: str | None,
+    duration_sec: int | None,
+    actual_start_time: datetime | None,
+    live_broadcast_content: str | None = None,
+) -> int:
     """Return the category_id of the first rule in config.CATEGORY_RULES that matches."""
-    title = title or ""
+    video = config.VideoInfo.build(title, duration_sec, actual_start_time, live_broadcast_content)
     for category_id, rule in config.CATEGORY_RULES:
-        if rule(title, duration_sec, actual_start_time):
+        if rule(video):
             return category_id
     return config.CATEGORY_FALLBACK
 
@@ -174,7 +179,9 @@ def transform_videos(
             "live_broadcast_content": v["live_broadcast_content"],
             "actual_start_time": v["actual_start_time"],
             "actual_end_time": v["actual_end_time"],
-            "category_id": classify(v["title"], v["duration_sec"], v["actual_start_time"]),
+            "category_id": classify(
+                v["title"], v["duration_sec"], v["actual_start_time"], v["live_broadcast_content"]
+            ),
         })
 
         previous = previous_views.get(video_id)

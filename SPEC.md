@@ -35,7 +35,8 @@ plave-yt-analytics/
 ├── sql/
 │   ├── 01_ddl.sql
 │   ├── 02_seed_dim_date_category.sql
-│   └── 03_roles.sql       # read-only role for Power BI
+│   ├── 03_roles.sql       # read-only role for Power BI
+│   └── 04_category_v2.sql # migrate dim_category from 5 to 15 categories
 ├── tests/
 │   └── test_classification.py
 ├── requirements.txt
@@ -85,22 +86,42 @@ Timezone of reference: **Asia/Ho_Chi_Minh (UTC+7)**. GitHub cron runs in UTC.
 - `fetched_at` (TIMESTAMPTZ): the actual time the API response was received.
 
 ## 7. Video classification (Transform step, after API calls)
-Each video belongs to exactly ONE category, evaluated in this fixed priority order (rules validated against real channel data):
-1. **Music Video**: title contains `m/v` (case-insensitive) AND duration > 180s AND title has no `EXCLUDE_KEYWORDS`
-   (Premieres also have actualStartTime, so MV must be checked before Live)
-2. **Live**: has actualStartTime
-3. **Shorts**: title contains `#`
-4. **Performance**: title matches a keyword in `PERFORMANCE_KEYWORDS` (e.g. "performance", "stage", "live clip"), case-insensitive,
-   AND title has no `EXCLUDE_KEYWORDS`
-5. **Other**: everything else
+Each video belongs to exactly ONE of 15 categories. Definitions follow the channel's own public playlists
+(reviewed on all 1,836 videos, Nov 2026); the rules themselves only use stored fields, never playlists,
+because playlists cover less than half of the videos and are updated late.
 
-- `EXCLUDE_KEYWORDS` ("behind", "reaction", "비하인드", "리액션", case-insensitive) marks side content about an MV or stage.
-  It only blocks MV and Performance, so e.g. `[BEHIND] 'Star Trace' M/V (Performance Ver.) 비하인드` -> Other,
-  `'Born Savage' M/V Reaction` -> Other. A Live or Shorts video stays Live / Shorts.
-- Rules, keywords and the 180s threshold live in `config.py` only.
-- Raw fields (title, duration_sec, actual_start_time) are stored alongside `category_id`, so `reclassify.py` can re-run the rules from the DB without calling the API.
-- Unit tests cover: normal case of each category, Premiere MV (M/V + actualStartTime -> MV), M/V with duration exactly 180s (-> not MV), Live title containing `#` (-> Live), NULL duration, uppercase/lowercase keywords,
-  excluded keywords (behind / reaction M/V and Performance titles -> Other; Live / Shorts unaffected).
+| Category | Definition |
+|---|---|
+| Official M/V | As the PLAVE OFFICIAL M/V playlist: M/V, Special Video, Official Lyric Video, duration > 120s; not Performance Ver. |
+| Cover | `[COVER]`, `[From. PLAVE]`, songs of `[PLAVE BIRTHDAY GIFT]` (not the member playlists, not short cuts) |
+| Official Audio | Title contains "Official Audio" |
+| Performance | Own-channel videos of PLAVE STAGE CLIP, M/V (Performance Ver.), Dance Practice / Vertical Dance |
+| Live | Streamed (actualStartTime, or live / upcoming), not a Premiere and not PL:RADIO |
+| PL:RADIO | "PL:RADIO with DJ" |
+| LASSGO PLAVE | `[LASSGO PLAVE]` episodes and full cams |
+| PL:SENT | `[플레젠트]` / "PL:SENT" |
+| Highlight | `[하이라이트]` / Highlight, including songs from comeback lives |
+| Behind | As the PLAVE Behind playlist: `[BEHIND]`, `[SPECIAL]`, "Recording Behind" |
+| Promo | Teaser, highlight medley, concept / mood film, scheduler, ID clip, prologue, epilogue, etc. |
+| Other | Greetings, reactions, fanchant guides, playlists, interviews, A to T : JAPAN, PUBG, everything else |
+| Shorts - Clip | Shorts cut from shows: `#PLAVE_LIVE`, `#PL_RADIO`, `#LASSGO_PLAVE`, `#AtoT_JAPAN` |
+| Shorts - Promo | Shorts about releases, albums and tours |
+| Shorts - General | All other Shorts |
+
+- Evaluation order (first match wins): Shorts - Clip, Shorts - Promo, Shorts - General, PL:RADIO, Live,
+  Highlight (`[하이라이트]`), Promo, Behind, LASSGO PLAVE, PL:SENT, Other (reaction / guide / playlist), Performance,
+  Official M/V, Official Audio, Highlight (any "highlight"), Cover, then Other. `dim_category.priority` mirrors this order
+  (first rule of each category, Other last).
+- Shorts: not streamed, 0 < duration <= 180s, title has a real hashtag. `#1`, `#2` (episode numbers) and the
+  `｜#플레이브 PLAVE` signature are not hashtags; `｜#플레이브 #PLAVE` and `[COVER]` titles are Shorts only up to 60s.
+- Premieres also have actualStartTime: a streamed video with a release or series keyword is not Live.
+- Rules, keywords and thresholds live in `config.py` only.
+- Raw fields (title, duration_sec, actual_start_time, live_broadcast_content) are stored alongside `category_id`, so
+  `reclassify.py` can re-run the rules from the DB without calling the API (`--dry-run` shows the changes first).
+- Unit tests cover: normal cases of each category, Premieres, upcoming / running streams, duration thresholds, NULL duration,
+  NULL title, hashtag signatures, overlapping keywords, and that the SQL seed matches `config.py`.
+- Known limits: Shorts without any hashtag fall into Promo / Other (about a dozen, mostly from 2022-2024); show hashtags exist only
+  from 2024 to 2025, so Shorts - Clip and Shorts - General are not comparable outside that period.
 
 ## 8. Validation
 - IDs: video `^[A-Za-z0-9_-]{11}$`, channel `^UC[A-Za-z0-9_-]{22}$`. Invalid -> skip row, count in `rows_failed`, log WARNING.
@@ -224,7 +245,8 @@ CREATE TABLE fact_channel (
 - `is_view_drop` is computed before insert by comparing with the latest snapshot of the same video where `snapshot_ts < current snapshot_ts`.
 
 ### Seed (02_seed_dim_date_category.sql)
-- `dim_category`: (1, 'Music Video', 1), (2, 'Live', 2), (3, 'Shorts', 3), (4, 'Performance', 4), (5, 'Other', 5). IDs mirrored in `config.py`.
+- `dim_category`: the 15 categories of section 7; IDs and names mirrored in `config.py`. IDs 1-5 are kept from the first
+  5-category scheme. Existing databases are migrated with `04_category_v2.sql`, then `python src/reclassify.py`.
 - `dim_date`: `generate_series('2020-01-01', '2030-12-31', '1 day')`.
 
 ### Roles (03_roles.sql)
@@ -260,7 +282,7 @@ CREATE TABLE fact_channel (
 - Dashboard pages:
   1. Overview: KPIs (subscribers, total views, video count) + trend over time
   2. Growth: daily/weekly/monthly growth of views, likes, comments, subscribers
-  3. Category comparison: MV / Shorts / Live / Performance / Other
+  3. Category comparison: the 15 categories of section 7
   4. Video detail: ranking table + drill-through per video
   5. Pipeline health: from `run_log` (status, durations, quota, gaps between snapshots)
 
