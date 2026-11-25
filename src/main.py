@@ -2,8 +2,9 @@
 
     python src/main.py
 
-Every run: channel stats, full uploads-playlist scan, stats for the recent tier + new videos.
-Full run (also the old tier): no successful full run yet, or the latest is >= 12h older than snapshot_ts.
+Every run: channel stats, full uploads-playlist scan, stats for the recent tier, new videos
+and every Official M/V (any age).
+Full run (also the rest of the old tier): no successful full run yet, or the latest is >= 12h older than snapshot_ts.
 
 Status / exit code:
     success  everything fetched and loaded                       exit 0
@@ -27,7 +28,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import config
 import extract
 import transform
-from load import Database
+from load import Database, KnownVideo
 from logger import RunLogger, RunStats, trigger_source
 
 log = logging.getLogger("main")
@@ -43,19 +44,21 @@ def is_full_run(snapshot_ts: datetime, last_full_snapshot: datetime | None) -> b
 
 def select_video_ids(
     playlist_ids: Iterable[str],
-    known: Mapping[str, datetime],
+    known: Mapping[str, KnownVideo],
     snapshot_ts: datetime,
     full: bool,
 ) -> list[str]:
     """Videos to fetch, in playlist order. Only videos still in the playlist (deleted ones are dropped).
 
-    Hourly: new videos (not in dim_video) + known videos in the recent tier. Full: everything.
+    Hourly: new videos (not in dim_video) + recent tier + ALWAYS_FETCH_CATEGORIES (any age). Full: everything.
     """
     if full:
         return list(playlist_ids)
     return [
         vid for vid in playlist_ids
-        if vid not in known or transform.is_recent(known[vid], snapshot_ts)
+        if vid not in known
+        or transform.is_recent(known[vid].published_at, snapshot_ts)
+        or known[vid].category_id in config.ALWAYS_FETCH_CATEGORIES
     ]
 
 

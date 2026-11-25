@@ -59,9 +59,9 @@ plave-yt-analytics/
 
 ### Quota estimate (10,000 units/day free)
 Each list call = 1 unit. With N videos on the channel and R recent videos:
-- Hourly run: 1 (channel) + ceil(N/50) (playlist) + ceil(R/50) (recent stats)
-- Full run adds ceil((N-R)/50).
-- Example N = 600, R = 30: ~14 units/hour, ~26 for a full run -> ~360 units/day. Quota is not a concern.
+- Hourly run: 1 (channel) + ceil(N/50) (playlist) + ceil((R+M)/50) (stats; M = Official M/V older than 30 days)
+- Full run fetches all N videos: ceil(N/50) for stats instead.
+- Example (Nov 2026) N = 1,837, R = 35, M = 17: 40 units/hour, 75 for a full run -> ~1,030 units/day. Quota is not a concern.
 
 ## 5. Collection frequency (logic lives in main.py)
 Timezone of reference: **Asia/Ho_Chi_Minh (UTC+7)**. GitHub cron runs in UTC.
@@ -70,7 +70,9 @@ Timezone of reference: **Asia/Ho_Chi_Minh (UTC+7)**. GitHub cron runs in UTC.
   1. Fetch channel stats.
   2. Scan the **entire** uploads playlist (all pages) to get the full list of video IDs; IDs not yet in `dim_video` are new videos.
   3. Fetch stats + metadata for the **recent tier**: videos with `published_at` within 30 days of `snapshot_ts`, plus all new videos.
-- **Full run:** also fetch the **old tier** (all videos with `published_at` older than 30 days).
+  4. Also fetch every **Official M/V** whatever its age (`ALWAYS_FETCH_CATEGORIES` in config.py, using `dim_video.category_id`).
+     `fact_video.tier` still depends on age only, so an old M/V has hourly snapshots with `tier = 'old'`.
+- **Full run:** also fetch the rest of the **old tier** (all videos with `published_at` older than 30 days).
   - Rule: run the old tier if there is no successful full run in `run_log`, or if
     `snapshot_ts - (latest snapshot_ts of a successful full run) >= 12 hours`.
   - This self-heals when GitHub delays or skips a run (no dependency on hitting exactly 00:00/12:00).
@@ -321,6 +323,7 @@ CREATE TABLE fact_channel (
 | Connection | Session pooler, port 5432, SSL | Direct host is IPv6-only; GitHub Actions is IPv4 |
 | Snapshot time | Floored to the hour + actual `fetched_at`; UTC `TIMESTAMPTZ` + VN local column | Idempotent PK while keeping the real fetch time |
 | Old-tier schedule | Full run when >= 12h since last successful full run; cron at minute 17 | Self-heals when GitHub delays or skips runs |
+| Official M/V | Fetched every hour whatever their age | Most important content; only ~17 videos (+1 quota unit/hour, Nov 2026) |
 | Playlist scan | Entire uploads playlist every hour; stats by tier | Catch new videos quickly, keep storage small |
 | Deleted/private videos | No flag; video stops getting snapshots | Keeps the model simple |
 | `is_view_drop` | false when no previous snapshot | Nothing to compare against |

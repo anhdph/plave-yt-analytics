@@ -15,7 +15,7 @@ import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 from sqlalchemy import Column, Engine, MetaData, Table, create_engine, func, text, tuple_
 from sqlalchemy.dialects.postgresql import JSONB
@@ -115,6 +115,11 @@ def _upsert(
     return len(rows)
 
 
+class KnownVideo(NamedTuple):
+    published_at: datetime
+    category_id: int
+
+
 class Database:
     def __init__(self, engine: Engine | None = None):
         self.engine = engine or make_engine()
@@ -140,11 +145,11 @@ class Database:
 
     # --- Reads ------------------------------------------------------------------------
 
-    def get_known_videos(self) -> dict[str, datetime]:
-        """video_id -> published_at for every video already in dim_video."""
-        def fn(conn: Connection) -> dict[str, datetime]:
-            rows = conn.execute(text("SELECT video_id, published_at FROM plave.dim_video"))
-            return {r.video_id: r.published_at for r in rows}
+    def get_known_videos(self) -> dict[str, KnownVideo]:
+        """video_id -> tier selection fields for every video already in dim_video."""
+        def fn(conn: Connection) -> dict[str, KnownVideo]:
+            rows = conn.execute(text("SELECT video_id, published_at, category_id FROM plave.dim_video"))
+            return {r.video_id: KnownVideo(r.published_at, r.category_id) for r in rows}
         return self.run(fn)
 
     def get_previous_views(self, video_ids: list[str], before: datetime) -> dict[str, int]:

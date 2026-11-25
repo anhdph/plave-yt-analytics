@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 import config
 import extract
 import main
-from load import LoadStats
+from load import KnownVideo, LoadStats
 
 UTC = timezone.utc
 START = datetime(2026, 11, 19, 14, 17, 5, tzinfo=UTC)
@@ -16,6 +16,10 @@ SNAP_TS = START.replace(minute=0, second=0, microsecond=0)
 CHANNEL_ID = "UCPZIPuQPrfrUG9Xe_okEmQA"
 OLD = SNAP_TS - timedelta(days=200)
 RECENT = SNAP_TS - timedelta(days=3)
+
+
+def _known(published_at, category_id=config.CATEGORY_OTHER):
+    return KnownVideo(published_at, category_id)
 
 
 # --- is_full_run ----------------------------------------------------------------------
@@ -33,20 +37,30 @@ def test_full_run_every_12h(hours_ago, expected):
 
 def test_hourly_selects_recent_and_new_in_playlist_order():
     playlist = ["new00000001", "recent00001", "old00000001"]
-    known = {"recent00001": RECENT, "old00000001": OLD, "deleted0001": RECENT}
+    known = {"recent00001": _known(RECENT), "old00000001": _known(OLD), "deleted0001": _known(RECENT)}
     assert main.select_video_ids(playlist, known, SNAP_TS, full=False) == ["new00000001", "recent00001"]
 
 
 def test_full_selects_whole_playlist_only():
     playlist = ["recent00001", "old00000001"]
-    known = {"recent00001": RECENT, "old00000001": OLD, "deleted0001": OLD}
+    known = {"recent00001": _known(RECENT), "old00000001": _known(OLD), "deleted0001": _known(OLD)}
     assert main.select_video_ids(playlist, known, SNAP_TS, full=True) == playlist
 
 
 def test_recent_window_boundary():
     edge = SNAP_TS - timedelta(days=config.RECENT_WINDOW_DAYS)
-    known = {"edge0000001": edge, "older000001": edge - timedelta(seconds=1)}
+    known = {"edge0000001": _known(edge), "older000001": _known(edge - timedelta(seconds=1))}
     assert main.select_video_ids(list(known), known, SNAP_TS, full=False) == ["edge0000001"]
+
+
+def test_hourly_always_selects_old_official_mv():
+    known = {
+        "oldmv000001": _known(OLD, config.CATEGORY_OFFICIAL_MV),
+        "oldperf0001": _known(OLD, config.CATEGORY_PERFORMANCE),
+        "deletedmv01": _known(OLD, config.CATEGORY_OFFICIAL_MV),
+    }
+    playlist = ["oldperf0001", "oldmv000001"]
+    assert main.select_video_ids(playlist, known, SNAP_TS, full=False) == ["oldmv000001"]
 
 
 # --- safe_error -----------------------------------------------------------------------
@@ -145,7 +159,7 @@ class FakeRunLogger:
 
 PUBLISHED = {"new00000001": RECENT, "recent00001": RECENT, "old00000001": OLD}
 PLAYLIST = list(PUBLISHED)
-KNOWN = {"recent00001": RECENT, "old00000001": OLD}
+KNOWN = {"recent00001": _known(RECENT), "old00000001": _known(OLD)}
 
 
 def test_hourly_run_success():

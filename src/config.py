@@ -85,6 +85,9 @@ CATEGORY_PROMO = 13
 CATEGORY_SHORTS_CLIP = 14
 CATEGORY_SHORTS_PROMO = 15
 
+# Fetched every run whatever their age (SPEC section 5). fact_video.tier still depends on age only.
+ALWAYS_FETCH_CATEGORIES = frozenset({CATEGORY_OFFICIAL_MV})
+
 # category_id -> dim_category.category_name
 CATEGORY_NAMES = {
     CATEGORY_OFFICIAL_MV: "Official M/V",
